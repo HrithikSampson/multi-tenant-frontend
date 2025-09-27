@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Organization, Project, Task } from '../types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://multi-tenant-backend-ugnt-80ksha87c-hrithiks-projects-a05d4764.vercel.app/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://backend-1d8bdy2ai-hrithiks-projects-a05d4764.vercel.app/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
