@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 // Token store that can be accessed from anywhere, including API interceptors
 class TokenStore {
   private token: string | null = null;
@@ -7,17 +9,45 @@ class TokenStore {
     return this.token;
   }
 
-  getRefreshToken(): string | null {
+  async getRefreshToken(): Promise<string | null> {
     if (typeof document === 'undefined') return null;
+    
+    console.log('getRefreshToken: Checking for refresh token cookie...');
+    console.log('getRefreshToken: document.cookie =', document.cookie);
     
     // Read refresh token from cookie
     const cookies = document.cookie.split(';');
     for (const cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
+      const [name] = cookie.trim().split('=');
       if (name === 'refreshToken') {
-        return decodeURIComponent(value);
+        console.log('getRefreshToken: Found refresh token cookie, attempting refresh...');
+        // If we have a refresh token, try to get a new auth token
+        try {
+          const response = await axios.post('/auth/refresh', {}, {
+            baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://multi-tenant-backend-ugnt-80ksha87c-hrithiks-projects-a05d4764.vercel.app/api',
+            withCredentials: true,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+
+          console.log('getRefreshToken: Refresh response:', response.data);
+          if (response.data?.accessToken) {
+            this.setToken(response.data.accessToken);
+            return response.data.accessToken;
+          }
+          
+          // If refresh fails, clear the token
+          this.clearAuth();
+          return null;
+        } catch (error) {
+          console.error('Token refresh failed:', error);
+          this.clearAuth();
+          return null;
+        }
       }
     }
+    console.log('getRefreshToken: No refresh token cookie found');
     return null;
   }
 

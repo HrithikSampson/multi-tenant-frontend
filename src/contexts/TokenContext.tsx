@@ -16,13 +16,31 @@ interface TokenProviderProps {
 }
 
 export const TokenProvider: React.FC<TokenProviderProps> = ({ children }) => {
-  const [token, setTokenState] = useState<string | null>(tokenStore.getRefreshToken());
+  const [token, setTokenState] = useState<string | null>(null);
 
-  // Subscribe to token store changes
+  // Subscribe to token store changes and handle refresh
   useEffect(() => {
     const unsubscribe = tokenStore.subscribe(() => {
       setTokenState(tokenStore.getToken());
     });
+
+    // Initialize token state and try to refresh if needed
+    const initializeToken = async () => {
+      console.log('TokenContext: Initializing token...');
+      const currentToken = tokenStore.getToken();
+      console.log('TokenContext: Current token:', currentToken);
+      if (currentToken) {
+        setTokenState(currentToken);
+      } else {
+        console.log('TokenContext: No current token, attempting refresh...');
+        // Try to refresh token if no current token
+        const refreshedToken = await tokenStore.getRefreshToken();
+        console.log('TokenContext: Refreshed token:', refreshedToken);
+        setTokenState(refreshedToken);
+      }
+    };
+
+    initializeToken();
 
     return unsubscribe;
   }, []);
