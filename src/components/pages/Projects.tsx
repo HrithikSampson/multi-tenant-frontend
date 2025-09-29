@@ -39,7 +39,7 @@ const Projects: React.FC<ProjectsProps> = ({ organizationId }) => {
     try {
       const members = await organizationAPI.getMembers(organizationId);
       const currentUser = getStoredUser();
-      const userMember = members.find(member => member.id === currentUser?.id);
+      const userMember = members.find((member: { id: string | undefined; }) => member.id === currentUser?.id);
       setUserOrgRole(userMember?.role || null);
     } catch (err: unknown) {
       console.error('Failed to fetch user organization role:', err);
