@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { taskAPI, projectAPI } from '@/services/api';
 import { Task, Project } from '@/types';
 import { ArrowLeft, Plus, CheckCircle, Circle, Clock, Trash2, User, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
@@ -108,10 +107,13 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onUpdateStatus, onDelete, can
   );
 };
 
-const ProjectTasks: React.FC = () => {
-  const params = useParams();
+interface ProjectTasksProps {
+  organizationId: string;
+  projectId: string;
+}
+
+const ProjectTasks: React.FC<ProjectTasksProps> = ({ organizationId, projectId }) => {
   const searchParams = useSearchParams();
-  const projectId = params?.projectId as string;
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,7 +125,6 @@ const ProjectTasks: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [projectMembers, setProjectMembers] = useState<{id: string; username: string}[]>([]);
   console.log({projectMembers})
-  const { token, organizationId } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -140,13 +141,8 @@ const ProjectTasks: React.FC = () => {
   }, [projectId, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProject = async () => {
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      return;
-    }
-    
     try {
-      const proj = await projectAPI.getProject(projectId!, token, organizationId);
+      const proj = await projectAPI.getProject(projectId, organizationId);
       setProject(proj);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -155,14 +151,8 @@ const ProjectTasks: React.FC = () => {
   };
 
   const fetchTasks = async () => {
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      setLoading(false);
-      return;
-    }
-    
     try {
-      const taskList = await taskAPI.getTasks(projectId!, token, organizationId);
+      const taskList = await taskAPI.getTasks(projectId, organizationId);
       setTasks(taskList);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -173,12 +163,8 @@ const ProjectTasks: React.FC = () => {
   };
 
   const fetchProjectMembers = async () => {
-    if (!token || !organizationId) {
-      return;
-    }
-    
     try {
-      const members = await projectAPI.getProjectMembers(projectId!, token, organizationId);
+      const members = await projectAPI.getProjectMembers(projectId, organizationId);
       setProjectMembers(members);
     } catch (err: unknown) {
       console.error('Failed to fetch project members:', err);
@@ -190,18 +176,12 @@ const ProjectTasks: React.FC = () => {
     setCreating(true);
     setError('');
 
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      setCreating(false);
-      return;
-    }
-
     try {
-      await taskAPI.createTask(projectId!, {
+      await taskAPI.createTask(projectId, {
         title: newTaskTitle,
         description: newTaskDescription,
         assigneeId: newTaskAssigneeId || undefined,
-      }, token, organizationId);
+      }, organizationId);
       setNewTaskTitle('');
       setNewTaskDescription('');
       setNewTaskAssigneeId('');
@@ -209,7 +189,7 @@ const ProjectTasks: React.FC = () => {
       await fetchTasks();
       
       // Remove create=true from URL
-      router.replace(`/projects/${projectId}/tasks`);
+      router.replace(`/organization/${organizationId}/projects/${projectId}/tasks`);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
       setError(error.response?.data?.message || 'Failed to create task');
@@ -219,13 +199,8 @@ const ProjectTasks: React.FC = () => {
   };
 
   const handleUpdateTaskStatus = async (taskId: string, newStatus: 'TODO' | 'INPROGRESS' | 'DONE') => {
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      return;
-    }
-    
     try {
-      await taskAPI.updateTask(projectId!, taskId, { status: newStatus }, token, organizationId);
+      await taskAPI.updateTask(projectId, taskId, { status: newStatus }, organizationId);
       await fetchTasks();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -238,13 +213,8 @@ const ProjectTasks: React.FC = () => {
       return;
     }
 
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      return;
-    }
-
     try {
-      await taskAPI.deleteTask(projectId!, taskId, token, organizationId);
+      await taskAPI.deleteTask(projectId, taskId, organizationId);
       await fetchTasks();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -279,7 +249,7 @@ const ProjectTasks: React.FC = () => {
           <div className="flex items-center justify-between py-6">
             <div className="flex items-center">
               <button
-                onClick={() => router.push('/projects')}
+                onClick={() => router.push(`/organization/${organizationId}/projects`)}
                 className="mr-4 p-2 text-slate-400 hover:text-slate-600"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -292,7 +262,7 @@ const ProjectTasks: React.FC = () => {
             
             <div className="flex items-center space-x-3">
               <button
-                onClick={() => router.push(`/projects/${projectId}/settings`)}
+                onClick={() => router.push(`/organization/${organizationId}/projects/${projectId}/settings`)}
                 className="flex items-center px-4 py-2 bg-amber-800 text-white rounded-md hover:bg-amber-900 transition-colors"
                 title="Project Settings"
               >

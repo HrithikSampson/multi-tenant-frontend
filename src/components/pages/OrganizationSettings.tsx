@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import { organizationAPI, authAPI } from '@/services/api';
+import { getStoredUser } from '@/utils/auth';
 import { Organization } from '@/types';
 import { 
   ArrowLeft, 
@@ -22,7 +22,11 @@ interface OrganizationMember {
   joined_at: string;
 }
 
-const OrganizationSettings: React.FC = () => {
+interface OrganizationSettingsProps {
+  organizationId: string;
+}
+
+const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ organizationId }) => {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,26 +39,17 @@ const OrganizationSettings: React.FC = () => {
   const [searching, setSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   
-  const { token, organizationId, user } = useAuth();
   const router = useRouter();
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      setLoading(false);
-      return;
-    }
-    
     fetchOrganization();
     fetchMembers();
-  }, [token, organizationId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [organizationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchOrganization = async () => {
-    if (!token) return;
-    
     try {
-      const organizations = await organizationAPI.getOrganizations(token);
+      const organizations = await organizationAPI.getOrganizations();
       const currentOrg = organizations.find(org => org.id === organizationId);
       setOrganization(currentOrg || null);
     } catch (err: unknown) {
@@ -64,10 +59,8 @@ const OrganizationSettings: React.FC = () => {
   };
 
   const fetchMembers = async () => {
-    if (!token || !organizationId) return;
-    
     try {
-      const membersData = await organizationAPI.getMembers(organizationId, token);
+      const membersData = await organizationAPI.getMembers(organizationId);
       setMembers(membersData);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -78,7 +71,7 @@ const OrganizationSettings: React.FC = () => {
   };
 
   const searchUsers = async (query: string) => {
-    if (!query.trim() || !token) {
+    if (!query.trim()) {
       setSearchResults([]);
       setShowSearchResults(false);
       return;
@@ -86,7 +79,7 @@ const OrganizationSettings: React.FC = () => {
 
     setSearching(true);
     try {
-      const users = await authAPI.searchUsers(query, token, 10);
+      const users = await authAPI.searchUsers(query, 10);
       setSearchResults(users);
       setShowSearchResults(true);
     } catch {
@@ -130,19 +123,13 @@ const OrganizationSettings: React.FC = () => {
     setAdding(true);
     setError('');
 
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      setAdding(false);
-      return;
-    }
-
     try {
       // First, find the user by username
-      const user = await authAPI.findUserByUsername(newMemberUsername, token);
+      const user = await authAPI.findUserByUsername(newMemberUsername);
       const userId = user.id;
 
       // Then add the user to the organization
-      await organizationAPI.addMember(organizationId, userId, newMemberRole, token);
+      await organizationAPI.addMember(organizationId, userId, newMemberRole);
       
       setNewMemberUsername('');
       setNewMemberRole('USER');
@@ -160,10 +147,8 @@ const OrganizationSettings: React.FC = () => {
   };
 
   const handleUpdateMemberRole = async (memberId: string, newRole: 'OWNER' | 'ADMIN' | 'USER') => {
-    if (!token || !organizationId) return;
-
     try {
-      await organizationAPI.updateMemberRole(organizationId, memberId, newRole, token);
+      await organizationAPI.updateMemberRole(organizationId, memberId, newRole);
       await fetchMembers();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -172,14 +157,12 @@ const OrganizationSettings: React.FC = () => {
   };
 
   const handleRemoveMember = async (memberId: string) => {
-    if (!token || !organizationId) return;
-
     if (!confirm('Are you sure you want to remove this member?')) {
       return;
     }
 
     try {
-      await organizationAPI.removeMember(organizationId, memberId, token);
+      await organizationAPI.removeMember(organizationId, memberId);
       await fetchMembers();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -214,8 +197,9 @@ const OrganizationSettings: React.FC = () => {
   };
 
   // Check if current user can manage members (OWNER or ADMIN)
+  const currentUser = getStoredUser();
   const currentUserMember = members.find(member => {
-    return member.id === user?.id
+    return member.id === currentUser?.id
   });
   const canManageMembers = currentUserMember?.role === 'OWNER' || currentUserMember?.role === 'ADMIN';
   console.log({currentUserMember});
@@ -239,7 +223,7 @@ const OrganizationSettings: React.FC = () => {
           <div className="flex items-center justify-between py-6">
             <div className="flex items-center">
               <button
-                onClick={() => router.push('/projects')}
+                onClick={() => router.push(`/organization/${organizationId}/projects`)}
                 className="mr-4 p-2 text-slate-400 hover:text-slate-600"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -322,7 +306,7 @@ const OrganizationSettings: React.FC = () => {
                     </div>
                   </div>
                   
-                  {canManageMembers && member.id !== user?.id && (
+                  {canManageMembers && member.id !== currentUser?.id && (
                     <div className="flex items-center space-x-2">
                       <select
                         value={member.role}
@@ -345,7 +329,7 @@ const OrganizationSettings: React.FC = () => {
                     </div>
                   )}
                   
-                  {member.id === user?.id && (
+                  {member.id === currentUser?.id && (
                     <div className="flex items-center">
                       <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
                         You

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import { authAPI } from '@/services/api';
+import { useToken } from '@/contexts/TokenContext';
+import { setStoredUser } from '@/utils/auth';
 import { UserPlus, User, Lock } from 'lucide-react';
 
 const Register: React.FC = () => {
@@ -12,8 +13,8 @@ const Register: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const { setUser, setToken } = useAuth();
   const router = useRouter();
+  const { setToken } = useToken();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,8 +33,7 @@ const Register: React.FC = () => {
       // Use the access token from registration response instead of auto-login
       const { accessToken, user: userData } = response;
       
-      // Set the token and user data directly in context
-      setUser(userData);
+      setStoredUser(userData);
       setToken(accessToken);
       
       router.push('/workspace');
@@ -59,7 +59,7 @@ const Register: React.FC = () => {
             Or{' '}
             <Link
               href="/login"
-              className="font-medium text-primary-600 hover:text-primary-500"
+              className="font-medium text-blue-600 hover:text-blue-500"
             >
               sign in to your existing account
             </Link>

@@ -1,20 +1,21 @@
 'use client';
 
-import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { useToken } from '@/contexts/TokenContext';
+import { isAuthenticated } from '@/utils/auth';
 
 export default function Home() {
-  const { isAuthenticated } = useAuth();
   const router = useRouter();
+  const { token } = useToken();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated()) {
       router.push('/workspace');
     } else {
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [router, token]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">

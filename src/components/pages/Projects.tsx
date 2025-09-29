@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { projectAPI } from '@/services/api';
+import { projectAPI, organizationAPI } from '@/services/api';
+import { useToken } from '@/contexts/TokenContext';
+import { getStoredUser } from '@/utils/auth';
 import { Project } from '@/types';
 import { FolderPlus, Plus, Settings, Eye, Edit, Trash2 } from 'lucide-react';
 
-const Projects: React.FC = () => {
+interface ProjectsProps {
+  organizationId: string;
+}
+
+const Projects: React.FC<ProjectsProps> = ({ organizationId }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -13,20 +18,14 @@ const Projects: React.FC = () => {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectSlug, setNewProjectSlug] = useState('');
   const [creating, setCreating] = useState(false);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   
-  const { user, token, organizationId, logout } = useAuth();
   const router = useRouter();
+  const { clearAuth } = useToken();
 
   const fetchProjects = useCallback(async () => {
-    console.log('fetchProjects called with:', { token: !!token, organizationId });
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      setLoading(false);
-      return;
-    }
-    
     try {
-      const projs = await projectAPI.getProjects(token, organizationId);
+      const projs = await projectAPI.getProjects(organizationId);
       setProjects(projs);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -34,29 +33,31 @@ const Projects: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, organizationId]);
+  }, [organizationId]);
+
+  const fetchUserOrgRole = useCallback(async () => {
+    try {
+      const members = await organizationAPI.getMembers(organizationId);
+      const currentUser = getStoredUser();
+      const userMember = members.find(member => member.id === currentUser?.id);
+      setUserOrgRole(userMember?.role || null);
+    } catch (err: unknown) {
+      console.error('Failed to fetch user organization role:', err);
+    }
+  }, [organizationId]);
 
   useEffect(() => {
-    if (!organizationId) {
-      router.push('/workspace');
-      return;
-    }
     fetchProjects();
-  }, [organizationId, router, fetchProjects]);
+    fetchUserOrgRole();
+  }, [fetchProjects, fetchUserOrgRole]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreating(true);
     setError('');
 
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      setCreating(false);
-      return;
-    }
-
     try {
-      await projectAPI.createProject(newProjectName, newProjectSlug, token, organizationId);
+      await projectAPI.createProject(newProjectName, newProjectSlug, organizationId);
       setNewProjectName('');
       setNewProjectSlug('');
       setShowCreateForm(false);
@@ -74,13 +75,8 @@ const Projects: React.FC = () => {
       return;
     }
 
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      return;
-    }
-
     try {
-      await projectAPI.deleteProject(projectId, token, organizationId);
+      await projectAPI.deleteProject(projectId, organizationId);
       await fetchProjects();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -129,17 +125,22 @@ const Projects: React.FC = () => {
               <p className="text-slate-600">Manage your projects and tasks</p>
             </div>  
             <div className="flex items-center space-x-4">
+              {(userOrgRole === 'OWNER' || userOrgRole === 'ADMIN') && (
+                <button
+                  onClick={() => router.push(`/organization/${organizationId}/settings`)}
+                  className="flex items-center px-3 py-2 bg-amber-800 text-sm text-white hover:text-white hover:bg-amber-900 rounded-md transition-colors"
+                  title="Organization Settings"
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Organization Settings
+                </button>
+              )}
+              <span className="text-sm text-slate-500">Welcome, {getStoredUser()?.username}</span>
               <button
-                onClick={() => router.push('/organization/settings')}
-                className="flex items-center px-3 py-2 bg-amber-800 text-sm text-white hover:text-white hover:bg-amber-900 rounded-md transition-colors"
-                title="Organization Settings"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Organization Settings
-              </button>
-              <span className="text-sm text-slate-500">Welcome, {user?.username}</span>
-              <button
-                onClick={logout}
+                onClick={() => {
+                  clearAuth();
+                  router.push('/login');
+                }}
                 className="text-sm text-slate-500 hover:text-slate-700"
               >
                 Logout
@@ -183,7 +184,7 @@ const Projects: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <button
-                    onClick={() => router.push(`/projects/${project.id}/tasks`)}
+                    onClick={() => router.push(`/organization/${organizationId}/projects/${project.id}/tasks`)}
                     className="flex items-center px-4 py-2 bg-amber-800 hover:bg-amber-900 text-white rounded-md transition-colors text-sm font-medium"
                   >
                     <Eye className="h-4 w-4 mr-2" />
@@ -192,7 +193,7 @@ const Projects: React.FC = () => {
                   
                   <div className="flex space-x-1">
                     <button
-                      onClick={() => router.push(`/projects/${project.id}/settings`)}
+                      onClick={() => router.push(`/organization/${organizationId}/projects/${project.id}/settings`)}
                       className="p-2 text-slate-400 hover:text-slate-600"
                       title="Project Settings"
                     >
@@ -210,7 +211,7 @@ const Projects: React.FC = () => {
                 
                 {(project.user_role === 'EDITOR' || !project.user_role) && (
                   <button
-                    onClick={() => router.push(`/projects/${project.id}/tasks?create=true`)}
+                    onClick={() => router.push(`/organization/${organizationId}/projects/${project.id}/tasks?create=true`)}
                     className="w-full flex items-center justify-center px-4 py-3 bg-amber-800 text-white rounded-md hover:bg-primary-700 transition-colors text-base font-semibold shadow-md hover:shadow-lg"
                   >
                     <Plus className="h-5 w-5 mr-2" />
@@ -281,7 +282,7 @@ const Projects: React.FC = () => {
                   <button
                     type="submit"
                     disabled={creating}
-                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
+                    className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 disabled:opacity-50"
                   >
                     {creating ? 'Creating...' : 'Create'}
                   </button>

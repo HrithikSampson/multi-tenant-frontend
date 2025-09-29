@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
 import { projectAPI, authAPI } from '@/services/api';
 import { Project } from '@/types';
 import { ArrowLeft, Plus, UserPlus, Trash2, Crown, Edit, Eye } from 'lucide-react';
@@ -15,9 +14,12 @@ interface ProjectMember {
   joined_at: string;
 }
 
-const ProjectSettings: React.FC = () => {
-  const params = useParams();
-  const projectId = params?.projectId as string;
+interface ProjectSettingsProps {
+  organizationId: string;
+  projectId: string;
+}
+
+const ProjectSettings: React.FC<ProjectSettingsProps> = ({ organizationId, projectId }) => {
   const [project, setProject] = useState<Project | null>(null);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,6 @@ const ProjectSettings: React.FC = () => {
   const [searching, setSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   
-  const { token, organizationId } = useAuth();
   const router = useRouter();
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -42,13 +43,8 @@ const ProjectSettings: React.FC = () => {
   }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProject = async () => {
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      return;
-    }
-    
     try {
-      const proj = await projectAPI.getProject(projectId!, token, organizationId);
+      const proj = await projectAPI.getProject(projectId, organizationId);
       setProject(proj);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -57,14 +53,8 @@ const ProjectSettings: React.FC = () => {
   };
 
   const fetchMembers = async () => {
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      setLoading(false);
-      return;
-    }
-    
     try {
-      const memberList = await projectAPI.getProjectMembers(projectId!, token, organizationId);
+      const memberList = await projectAPI.getProjectMembers(projectId, organizationId);
       setMembers(memberList);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -75,7 +65,7 @@ const ProjectSettings: React.FC = () => {
   };
 
   const searchUsers = async (query: string) => {
-    if (!query.trim() || !token) {
+    if (!query.trim()) {
       setSearchResults([]);
       setShowSearchResults(false);
       return;
@@ -83,7 +73,7 @@ const ProjectSettings: React.FC = () => {
 
     setSearching(true);
     try {
-      const users = await authAPI.searchUsers(query, token, 10);
+      const users = await authAPI.searchUsers(query, 10);
       setSearchResults(users);
       setShowSearchResults(true);
     } catch {
@@ -127,22 +117,16 @@ const ProjectSettings: React.FC = () => {
     setAdding(true);
     setError('');
 
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      setAdding(false);
-      return;
-    }
-
     try {
       // First, find the user by username
-      const user = await authAPI.findUserByUsername(newMemberUsername, token);
+      const user = await authAPI.findUserByUsername(newMemberUsername);
       const userId = user.id;
 
       // Then add the user to the project
-      await projectAPI.addProjectMember(projectId!, {
+      await projectAPI.addProjectMember(projectId, {
         userId: userId,
         role: newMemberRole,
-      }, token, organizationId);
+      }, organizationId);
       
       setNewMemberUsername('');
       setNewMemberRole('VIEWER');
@@ -159,13 +143,8 @@ const ProjectSettings: React.FC = () => {
   };
 
   const handleUpdateMemberRole = async (memberId: string, newRole: 'EDITOR' | 'VIEWER') => {
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      return;
-    }
-
     try {
-      await projectAPI.updateProjectMemberRole(projectId!, memberId, newRole, token, organizationId);
+      await projectAPI.updateProjectMemberRole(projectId, memberId, newRole, organizationId);
       await fetchMembers();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -178,13 +157,8 @@ const ProjectSettings: React.FC = () => {
       return;
     }
 
-    if (!token || !organizationId) {
-      setError('No authentication token or organization available');
-      return;
-    }
-
     try {
-      await projectAPI.removeProjectMember(projectId!, memberId, token, organizationId);
+      await projectAPI.removeProjectMember(projectId, memberId, organizationId);
       await fetchMembers();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -232,7 +206,7 @@ const ProjectSettings: React.FC = () => {
           <div className="flex items-center justify-between py-6">
             <div className="flex items-center">
               <button
-                onClick={() => router.push('/projects')}
+                onClick={() => router.push(`/organization/${organizationId}/projects`)}
                 className="mr-4 p-2 text-slate-400 hover:text-slate-600"
               >
                 <ArrowLeft className="h-5 w-5" />

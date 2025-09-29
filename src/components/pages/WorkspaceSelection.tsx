@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import { organizationAPI } from '@/services/api';
+import { getStoredUser } from '@/utils/auth';
 import { Organization } from '@/types';
 import { Building2, Plus, ArrowRight, Crown, Shield, User } from 'lucide-react';
 
@@ -14,18 +14,11 @@ const WorkspaceSelection: React.FC = () => {
   const [newOrgSubdomain, setNewOrgSubdomain] = useState('');
   const [creating, setCreating] = useState(false);
   
-  const { user, token, setOrganization } = useAuth();
   const router = useRouter();
 
   const fetchOrganizations = useCallback(async () => {
-    if (!token) {
-      setError('No authentication token available');
-      setLoading(false);
-      return;
-    }
-    
     try {
-      const orgs = await organizationAPI.getOrganizations(token);
+      const orgs = await organizationAPI.getOrganizations();
       setOrganizations(orgs);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -33,24 +26,19 @@ const WorkspaceSelection: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     fetchOrganizations();
   }, [fetchOrganizations]);
 
   const handleSelectOrganization = async (orgId: string) => {
-    console.log('handleSelectOrganization called with:', { orgId, token: !!token });
-    if (!token) {
-      setError('No authentication token available');
-      return;
-    }
+    console.log('handleSelectOrganization called with:', { orgId });
     
     try {
-      await organizationAPI.switchOrganization(orgId, token);
-      setOrganization(orgId);
-      console.log('Organization set, navigating to projects');
-      router.push('/projects');
+      await organizationAPI.switchOrganization(orgId);
+      console.log('Organization set, navigating to organization projects');
+      router.push(`/organization/${orgId}/projects`);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
       setError(error.response?.data?.message || 'Failed to switch organization');
@@ -62,14 +50,8 @@ const WorkspaceSelection: React.FC = () => {
     setCreating(true);
     setError('');
 
-    if (!token) {
-      setError('No authentication token available');
-      setCreating(false);
-      return;
-    }
-
     try {
-      await organizationAPI.createOrganization(newOrgName, newOrgSubdomain, token);
+      await organizationAPI.createOrganization(newOrgName, newOrgSubdomain);
       setNewOrgName('');
       setNewOrgSubdomain('');
       setShowCreateForm(false);
@@ -116,7 +98,7 @@ const WorkspaceSelection: React.FC = () => {
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-slate-900">Welcome, {user?.username}!</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Welcome, {getStoredUser()?.username}!</h1>
           <p className="mt-2 text-slate-600">Select a workspace to continue</p>
         </div>
 
@@ -215,7 +197,7 @@ const WorkspaceSelection: React.FC = () => {
                   <button
                     type="submit"
                     disabled={creating}
-                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
+                    className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 disabled:opacity-50"
                   >
                     {creating ? 'Creating...' : 'Create'}
                   </button>

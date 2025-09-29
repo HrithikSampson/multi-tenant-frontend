@@ -41,16 +41,3 @@ export interface ProjectMember {
   joined_at: string;
 }
 
-export interface AuthContextType {
-  user: User | null;
-  token: string | null;
-  organizationId: string | null;
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
-  setOrganization: (organizationId: string) => void;
-  setUser: (user: User | null) => void;
-  setToken: (token: string | null) => void;
-  updateToken: (newToken: string) => void;
-  isAuthenticated: boolean;
-  refreshToken: () => Promise<boolean>;
-}

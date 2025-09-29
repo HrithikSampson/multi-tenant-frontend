@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { authAPI } from '@/services/api';
+import { useToken } from '@/contexts/TokenContext';
+import { setStoredUser } from '@/utils/auth';
 import { LogIn, User, Lock } from 'lucide-react';
 
 const Login: React.FC = () => {
@@ -10,8 +12,8 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const { login } = useAuth();
   const router = useRouter();
+  const { setToken } = useToken();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +21,12 @@ const Login: React.FC = () => {
     setError('');
 
     try {
-      await login(username, password);
+      const response = await authAPI.login(username, password);
+      const { accessToken, user: userData } = response;
+      
+      setToken(accessToken);
+      setStoredUser(userData);
+      
       router.push('/workspace');
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
@@ -43,7 +50,7 @@ const Login: React.FC = () => {
             Or{' '}
             <Link
               href="/register"
-              className="font-medium text-primary-600 hover:text-primary-500"
+              className="font-medium text-blue-600 hover:text-blue-500"
             >
               create a new account
             </Link>
