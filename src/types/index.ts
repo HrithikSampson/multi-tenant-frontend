@@ -41,3 +41,17 @@ export interface ProjectMember {
   joined_at: string;
 }
 
+export interface Activity {
+  id: string;
+  kind: 'WARN' | 'ALERT' | 'NOTIFY' | 'ANNOUNCE' | 'SHOW';
+  message: string;
+  objectType?: string;
+  objectId?: string;
+  meta: Record<string, unknown>;
+  createdAt: string;
+  actor: {
+    id: string;
+    username: string;
+  };
+}
+

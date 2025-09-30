@@ -5,6 +5,7 @@ import { useToken } from '@/contexts/TokenContext';
 import { getStoredUser } from '@/utils/auth';
 import { Project } from '@/types';
 import { FolderPlus, Plus, Settings, Eye, Edit, Trash2 } from 'lucide-react';
+import ActivityFeed from '@/components/ActivityFeed';
 
 interface ProjectsProps {
   organizationId: string;
@@ -19,6 +20,7 @@ const Projects: React.FC<ProjectsProps> = ({ organizationId }) => {
   const [newProjectSlug, setNewProjectSlug] = useState('');
   const [creating, setCreating] = useState(false);
   const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
+  const [organizationSlug, setOrganizationSlug] = useState<string>('');
   
   const router = useRouter();
   const { clearAuth } = useToken();
@@ -46,10 +48,23 @@ const Projects: React.FC<ProjectsProps> = ({ organizationId }) => {
     }
   }, [organizationId]);
 
+  const fetchOrganizationData = useCallback(async () => {
+    try {
+      const organizations = await organizationAPI.getOrganizations();
+      const currentOrg = organizations.find(org => org.id === organizationId);
+      if (currentOrg) {
+        setOrganizationSlug(currentOrg.subdomain);
+      }
+    } catch (err: unknown) {
+      console.error('Failed to fetch organization data:', err);
+    }
+  }, [organizationId]);
+
   useEffect(() => {
     fetchProjects();
     fetchUserOrgRole();
-  }, [fetchProjects, fetchUserOrgRole]);
+    fetchOrganizationData();
+  }, [fetchProjects, fetchUserOrgRole, fetchOrganizationData]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,7 +172,10 @@ const Projects: React.FC<ProjectsProps> = ({ organizationId }) => {
           </div>
         )}
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Projects Grid */}
+          <div className="lg:col-span-2">
+            <div className="grid gap-6 md:grid-cols-2">
           {projects.map((project) => (
             <div
               key={project.id}
@@ -231,6 +249,16 @@ const Projects: React.FC<ProjectsProps> = ({ organizationId }) => {
               <h3 className="text-lg font-medium text-slate-900">Create Project</h3>
               <p className="text-sm text-slate-500 text-center">Start a new project</p>
             </div>
+          </div>
+            </div>
+          </div>
+          
+          {/* Activity Feed */}
+          <div className="lg:col-span-1">
+            <ActivityFeed 
+              organizationId={organizationId} 
+              roomKey={organizationSlug} 
+            />
           </div>
         </div>
 

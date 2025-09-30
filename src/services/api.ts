@@ -229,4 +229,24 @@ export const taskAPI = {
   },
 };
 
+// Activity API
+export const activityAPI = {
+  getActivities: async (organizationId: string, page: number = 1, limit: number = 20, kind?: string, roomKey?: string) => {
+    const params = { page, limit, ...(kind && { kind }), ...(roomKey && { roomKey }) };
+    const response = await api.get(`/organizations/${organizationId}/activities`, { params });
+    return response.data;
+  },
+  
+  createActivity: async (organizationId: string, data: {
+    kind: string;
+    message: string;
+    objectType?: string;
+    objectId?: string;
+    meta?: Record<string, unknown>;
+  }) => {
+    const response = await api.post(`/organizations/${organizationId}/activities`, data);
+    return response.data;
+  },
+};
+
 export default api;
