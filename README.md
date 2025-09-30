@@ -1,5 +1,8 @@
 # Multi-Tenant Task Manager - Frontend
 
+### Deployment Link
+https://multi-tenant-frontend-opal.vercel.app/
+
 A Next.js-based frontend for a multi-tenant task management system. Each organization gets its own isolated workspace with real-time activity tracking.
 
 ## Running Locally
